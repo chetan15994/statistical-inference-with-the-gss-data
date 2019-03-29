@@ -1,0 +1,141 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+ 
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+Since 1972, the General Social Survey (GSS) has been monitoring societal change and studying the growing complexity of American society. The target population of the GSS is adults (18+) living in households in the United States. The GSS sample is drawn using an area probability design that randomly selects respondents in households across the United States to take part in the survey. Respondents that become part of the GSS sample are from a mix of urban, suburban, and rural geographic areas. Participation in the study is strictly voluntary.
+
+The survey is conducted face-to-face with an in-person interview by NORC at the university of Chicago. The survey was conducted every year from 1972 to 1994  (except in 1979, 1981, and 1992). Since 1994, it has been conducted every other year. The survey takes about 90 minutes to administer. AS of 2014, 30 national samples with 59,599 respondents and 5,900+ variables have been collected.
+
+Thus, the data was randomly sampled by simple random sample, so it can be used to make generalizations to the general population. However, no random assignment has been used to these data, so we can just get associations rather causations from the data, it's an observational study rather than experiment.
+
+But note that voluntary survey may cause bias, those who choose to refuse to respond would be underreported.
+
+* * *
+
+## Part 2: Research question
+### Is there any relationship between residents' degree level and their attitude towards sex with person other than spouse?
+Having sex with person other than spouse is a contentious topic, and I sometimes wonder that is there any relation between this attitude and people's education level? I may suppose that high level education will make it less possible to have sex with person other than spouse, owing to high degree people may be more self-discipline and have their own rules concerning sex. Maybe I am wrong, let's analyse the data to get a credible result.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+The following variables will be used to analyze: 
+degree: RS highest degree
+xmarsex: sex with person other than spouse
+
+select the useful data from gss, and save them in the dataframe "desex"
+```{r}
+desex <- select(gss, degree, xmarsex, year) %>%
+  na.omit()
+```
+
+Firstly, we just investigate the most recent data(2012)
+```{r}
+desex12 <- desex %>%
+  filter(year == "2012")
+```
+
+We define "Always wrong" as a negative attitude to sex with other peop1e, and define other uncertain attitudes as positive. We classify the data in this way because we suppose uncertainty about this issue means the person may have sex with people other than spouse when they have chances, but the one certainly thinks "Always wrong" won't do this even if he/she is seduced.
+```{r}
+desex12 <- desex12 %>%
+  mutate(sexatt = ifelse(xmarsex == "Always Wrong", "negative", "positive"))
+```
+
+Calculate the proportion of each variable
+```{r}
+desex12_table <- table(desex12$degree, desex12$sexatt) 
+prop.table(desex12_table)
+```
+
+Visualize the relationship between residents' education level and opinion to sex with people other than spouse by using barplot.
+```{r}
+ggplot(data = desex12, aes(x = degree, fill = sexatt)) +
+  geom_bar(position = "fill") +
+  labs(x = "Respondents' degree", y = "Proportion", title = "Relation between residents' degree and their attitude to sex with others") +
+  scale_fill_discrete(name = "Attitude")
+```
+
+From the barplot, we can see that in these 5 degree levels, the proportion of negative opinion in graduate is the lowest, which is contrary to my guess in the beginning. Based on this plot, we can say that as the resident's education level increases, their opinion to having sex with person other than spouse will be more neutral, they may not think as same as people with a comparatively low education level that only have sex with their spouse as an unbreakable rule.
+
+Also, let's take a look at how time change people's attitude. Since GSS spans such a long time, we could classify "year>=2000" as recent year survey, and classify the remaining as old year survey.
+```{r}
+desexsv <- desex %>%
+  mutate(recent = ifelse(year >= 2000, "R", "O")) %>%
+  mutate(sexats = ifelse(xmarsex == "Always Wrong", "negative", "positive"))
+```
+
+```{r}
+ggplot(data = desexsv, aes(x = recent, fill = sexats)) +
+  geom_bar(position = "fill") +
+  facet_grid(~degree) +
+  labs(x = "survey time", y = "Proportion", title = "Relation between residents' degree and their attitude to sex with others") +
+  scale_fill_discrete(name = "Attitude")
+```
+
+From the plot we can see that recently(after2000), the proportion of negative attitude towards having sex with person other than spouse among all the degree levels' people has increased.
+
+* * *
+
+## Part 4: Inference
+From the above analysis, we know that as people's degree level increases, he will be less possible to hold a negative opinion on sex with others. But is that just because of chance? Or the attitude to sex with other people really have relation with people's degree? In this part, I am going to compare the proportion of negative attitude for 5 education degree levels in America in 2012 using a hypothesis test. 
+
+### Conditions:
+1) independence: Because GSS used random sampling, we have no reason to say it isn't independent. So we assume it's independent between observations. Certainly, the sample size < 10% population.
+2) sample size/ skew: As we can see in the table below, there are at least 5 couts for each cell.
+
+```{r}
+table(desex12$degree, desex12$sexatt)
+```
+
+Thus, we can say that conditions for hypothesis test are met.
+
+### Method: 
+As we have two categorical variables, and one of them has 5 levels, we will use chi-square test of independence.
+
+In chi-square test, we will need to get the X^2 value and df, so that we could construct the chi-plot and get p-value. Note that chi-square test hasn't defined confidence interval, so we don't do this in the analysis.
+
+### Hypothesis:
+H_0: Degree and attitude to sex with people other than spouse are independent, negative opinion rates do not vary by degree level.
+H_A: Degree and attitude to sex with people other than spouse are dependent, negative opinion rates do vary by degree level.
+
+### Inference:
+```{r}
+chisq.test(desex12$degree, desex12$sexatt)
+```
+As we can see from the inference result, X-squared value is 41.576, df value is 4, p_value is 2.043e-08, which is very small.
+
+### Interpretation
+From the inference, we get a small p-value, which is highly below alpha(0.05), so we can conclude that we should reject H_0(null hypothesis). Please note, in this content, it means that negative opinion rates do vary by degree level.
+
+However, this result cannot be used to determine causality, because no random assignment was used. It's just an observational study rather than experiment. We cannot conclude that attitude towards sex with others depends on degree, because there may be other variables contribute to people's opinions. 
+
+* * *
